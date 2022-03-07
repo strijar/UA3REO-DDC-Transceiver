@@ -7,7 +7,7 @@
 
   <Targets>
     <Target>
-      <TargetName>WOLF</TargetName>
+      <TargetName>ILI9481</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
       <pCCUsed>6160000::V6.16::ARMCLANG</pCCUsed>
@@ -17753,7 +17753,6 @@
           <targetInfo name="RA8875_GT911"/>
           <targetInfo name="ST7796S"/>
           <targetInfo name="WF-100D"/>
-          <targetInfo name="WOLF"/>
         </targetInfos>
       </component>
       <component Cclass="CMSIS" Cgroup="DSP" Cvariant="Source" Cvendor="ARM" Cversion="1.9.0-dev" condition="CMSIS DSP">

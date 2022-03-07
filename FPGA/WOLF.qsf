@@ -282,6 +282,8 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_CLK
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_CS
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_MISO
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_MOSI
+set_global_assignment -name QSYS_FILE DEBUG2.qsys
+set_global_assignment -name QSYS_FILE DEBUG.qsys
 set_global_assignment -name BDF_FILE WOLF.bdf
 set_global_assignment -name VERILOG_FILE DAC_corrector.v
 set_global_assignment -name VERILOG_FILE spi_interface.v

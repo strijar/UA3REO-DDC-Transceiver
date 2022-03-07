@@ -1032,7 +1032,6 @@ static void FGPA_process_SPI(bool half)
 		start_index = FPGA_RX_IQ_BUFFER_HALF_SIZE;
 		end_index = FPGA_RX_IQ_BUFFER_SIZE;
 	}
-	FPGA_samples += FPGA_RX_IQ_BUFFER_HALF_SIZE;
 	
 	int32_t FPGA_fpgadata_in_tmp32 = 0;
 	float32_t FPGA_fpgadata_in_float32_i = 0;
@@ -1061,7 +1060,8 @@ static void FGPA_process_SPI(bool half)
 		state++;
 		if(state > 1) { //block complete
 			state = 0;
-			
+		
+		FPGA_samples++;
 		FPGA_Audio_RXBuffer_Index++;
 		if (FPGA_Audio_RXBuffer_Index == FPGA_RX_IQ_BUFFER_HALF_SIZE)
 		{

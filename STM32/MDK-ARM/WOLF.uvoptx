@@ -22,7 +22,7 @@
   </DaveTm>
 
   <Target>
-    <TargetName>WOLF</TargetName>
+    <TargetName>ILI9481</TargetName>
     <ToolsetNumber>0x4</ToolsetNumber>
     <ToolsetName>ARM-ADS</ToolsetName>
     <TargetOption>

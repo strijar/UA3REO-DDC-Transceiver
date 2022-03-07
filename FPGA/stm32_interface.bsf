@@ -143,6 +143,13 @@ refer to the applicable agreement for further details.
 		(line (pt 0 288)(pt 16 288)(line_width 1))
 	)
 	(port
+		(pt 0 304)
+		(input)
+		(text "iq_clk" (rect 0 0 22 12)(font "Arial" ))
+		(text "iq_clk" (rect 21 299 43 311)(font "Arial" ))
+		(line (pt 0 304)(pt 16 304)(line_width 1))
+	)
+	(port
 		(pt 304 48)
 		(output)
 		(text "NCO1_freq[31..0]" (rect 0 0 70 12)(font "Arial" ))
@@ -407,6 +414,13 @@ refer to the applicable agreement for further details.
 		(text "BUS_SPI_enable" (rect 0 0 69 12)(font "Arial" ))
 		(text "BUS_SPI_enable" (rect 214 635 283 647)(font "Arial" ))
 		(line (pt 304 640)(pt 288 640)(line_width 1))
+	)
+	(port
+		(pt 304 656)
+		(output)
+		(text "BUS_SPI_Stage[7..0]" (rect 0 0 87 12)(font "Arial" ))
+		(text "BUS_SPI_Stage[7..0]" (rect 196 651 283 663)(font "Arial" ))
+		(line (pt 304 656)(pt 288 656)(line_width 3))
 	)
 	(port
 		(pt 304 32)

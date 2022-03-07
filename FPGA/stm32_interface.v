@@ -16,6 +16,7 @@ VCXO_error,
 BUS_SPI_data_in,
 BUS_SPI_busy,
 spi_clk,
+iq_clk,
 
 DATA_BUS,
 NCO1_freq,
@@ -56,6 +57,7 @@ DAC_DRV_A0,
 DAC_DRV_A1,
 BUS_SPI_data_out,
 BUS_SPI_enable,
+BUS_SPI_Stage
 );
 
 input clk_in;
@@ -75,6 +77,7 @@ input FLASH_busy;
 input signed [23:0] VCXO_error;
 input BUS_SPI_busy;
 input spi_clk;
+input iq_clk;
 
 output reg unsigned [31:0] NCO1_freq = 242347;
 output reg unsigned [31:0] NCO2_freq = 242347;
@@ -114,6 +117,7 @@ output reg DAC_DRV_A1 = 1;
 output reg unsigned [10:0] RX_CIC_RATE = 'd640;
 output reg unsigned [31:0] BUS_SPI_data_out = 0;
 output reg BUS_SPI_enable = 0;
+output reg unsigned [7:0] BUS_SPI_Stage = 'd0;
 
 inout [3:0] DATA_BUS;
 reg   [3:0] DATA_BUS_OUT;
@@ -128,8 +132,6 @@ reg signed [31:0] READ_RX1_Q;
 reg ADC_MINMAX_RESET;
 reg sync_reset_n = 1;
 reg unsigned [3:0] BUS_TEST;
-reg unsigned [3:0] BUS_SPI_Stage = 'd0;
-reg BUS_SPI_IQ_Ready = 0;
 
 always @ (posedge clk_in)
 begin
@@ -157,11 +159,6 @@ begin
 		begin
 			tx_iq_valid = 0;
 			k = 300;
-		end
-		else if(DATA_BUS[3:0] == 'd4) //RX IQ
-		begin
-			DATA_BUS_OE = 1;
-			k = 400;
 		end
 		else if(DATA_BUS[3:0] == 'd5) //RESET ON
 		begin
@@ -595,176 +592,6 @@ begin
 		tx_iq_valid = 1;
 		k = 999;
 	end
-	else if (k == 400) //RX1 IQ
-	begin
-		IQ_RX_READ_REQ = 1;
-		IQ_RX_READ_CLK = 1;
-		READ_RX1_I[31:0] = RX1_I[31:0];
-		READ_RX1_Q[31:0] = RX1_Q[31:0];
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[31:28];
-		BUS_SPI_IQ_Ready = 1;
-		k = 401;
-	end
-	else if (k == 401)
-	begin
-		IQ_RX_READ_CLK = 0;
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[27:24];
-		BUS_SPI_IQ_Ready = 0;
-		k = 402;
-	end
-	else if (k == 402)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[23:20];
-		k = 403;
-	end
-	else if (k == 403)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[19:16];
-		k = 404;
-	end
-	else if (k == 404)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[15:12];
-		k = 405;
-	end
-	else if (k == 405)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[11:8];
-		k = 406;
-	end
-	else if (k == 406)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[7:4];
-		k = 407;
-	end
-	else if (k == 407)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_Q[3:0];
-		k = 408;
-	end
-	else if (k == 408)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[31:28];
-		k = 409;
-	end
-	else if (k == 409)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[27:24];
-		k = 410;
-	end
-	else if (k == 410)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[23:20];
-		k = 411;
-	end
-	else if (k == 411)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[19:16];
-		k = 412;
-	end
-	else if (k == 412)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[15:12];
-		k = 413;
-	end
-	else if (k == 413)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[11:8];
-		k = 414;
-	end
-	else if (k == 414)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[7:4];
-		k = 415;
-	end
-	else if (k == 415)
-	begin
-		DATA_BUS_OUT[3:0] = READ_RX1_I[3:0];
-		if(rx2 == 1)
-			k = 416;
-		else
-			k = 400;
-	end
-	else if (k == 416) //RX2 IQ
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[31:28];
-		k = 417;
-	end
-	else if (k == 417)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[27:24];
-		k = 418;
-	end
-	else if (k == 418)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[23:20];
-		k = 419;
-	end
-	else if (k == 419)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[19:16];
-		k = 420;
-	end
-	else if (k == 420)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[15:12];
-		k = 421;
-	end
-	else if (k == 421)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[11:8];
-		k = 422;
-	end
-	else if (k == 422)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[7:4];
-		k = 423;
-	end
-	else if (k == 423)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_Q[3:0];
-		k = 424;
-	end
-	else if (k == 424)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[31:28];
-		k = 425;
-	end
-	else if (k == 425)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[27:24];
-		k = 426;
-	end
-	else if (k == 426)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[23:20];
-		k = 427;
-	end
-	else if (k == 427)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[19:16];
-		k = 428;
-	end
-	else if (k == 428)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[15:12];
-		k = 429;
-	end
-	else if (k == 429)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[11:8];
-		k = 430;
-	end
-	else if (k == 430)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[7:4];
-		k = 431;
-	end
-	else if (k == 431)
-	begin
-		DATA_BUS_OUT[3:0] = RX2_I[3:0];
-		k = 400;
-	end
 	else if (k == 500) //BUS TEST
 	begin
 		BUS_TEST[3:0] = DATA_BUS[3:0];
@@ -861,39 +688,52 @@ begin
 	end
 end
 
-always @ (negedge spi_clk)
-begin
-	//BUS SPI
-	if(BUS_SPI_Stage == 0 && BUS_SPI_IQ_Ready == 1)
-	begin
-		BUS_SPI_data_out[31:0] = READ_RX1_I[31:0];
-		BUS_SPI_enable = 1;
-		BUS_SPI_Stage = 1;
-	end
-	else if(BUS_SPI_Stage == 1 && BUS_SPI_busy == 0)
-	begin
-		BUS_SPI_enable = 0;
-		BUS_SPI_Stage = 2;
-	end
-	else if(BUS_SPI_Stage == 2)
-	begin
-		BUS_SPI_data_out[31:0] = READ_RX1_Q[31:0];
-		BUS_SPI_enable = 1;
-		BUS_SPI_Stage = 3;
-	end
-	else if(BUS_SPI_Stage == 3 && BUS_SPI_busy == 0)
-	begin
-		BUS_SPI_enable = 0;
-		BUS_SPI_Stage = 0;
-	end
-end
-
-
 always @ (negedge adcclk_in)
 begin
 	//RESET SYNC
 	reset_n = sync_reset_n;
 end
 
+always @ (posedge spi_clk)
+begin
+	//BUS SPI
+	if(BUS_SPI_Stage == 0 && iq_clk == 1) //start RX1 I
+	begin
+		IQ_RX_READ_REQ = 1;
+		IQ_RX_READ_CLK = 1;
+		READ_RX1_I[31:0] = RX1_I[31:0];
+		READ_RX1_Q[31:0] = RX1_Q[31:0];
+		//
+		BUS_SPI_data_out[31:0] = READ_RX1_I[31:0];
+		BUS_SPI_enable = 1;
+		BUS_SPI_Stage = 1;
+	end
+	else if(BUS_SPI_Stage == 1 && BUS_SPI_busy == 1) //wait
+	begin
+		BUS_SPI_Stage = 2;
+	end
+	else if(BUS_SPI_Stage == 2 && BUS_SPI_busy == 0) //end RX1 I
+	begin
+		IQ_RX_READ_CLK = 0;
+		//
+		BUS_SPI_enable = 0;
+		BUS_SPI_Stage = 3;
+	end
+	else if(BUS_SPI_Stage == 3 && iq_clk == 0) //start RX1 Q
+	begin
+		BUS_SPI_data_out[31:0] = READ_RX1_Q[31:0];
+		BUS_SPI_enable = 1;
+		BUS_SPI_Stage = 4;
+	end
+	else if(BUS_SPI_Stage == 4 && BUS_SPI_busy == 1) //wait
+	begin
+		BUS_SPI_Stage = 5;
+	end
+	else if(BUS_SPI_Stage == 5 && BUS_SPI_busy == 0) //end RX1 Q
+	begin
+		BUS_SPI_enable = 0;
+		BUS_SPI_Stage = 0;
+	end
+end
 
 endmodule
