@@ -225,18 +225,17 @@ void FPGA_fpgadata_stuffclock(void)
 // exchange IQ data with FPGA
 void FPGA_fpgadata_iqclock(void)
 {
-	if (FPGA_bus_stop)
-		return;
-	VFO *current_vfo = CurrentVFO;
-	if (current_vfo->Mode == TRX_MODE_LOOPBACK)
-		return;
-	//data exchange
-
 	//STAGE 1
 	//out
-	FPGA_setBusOutput();
 	if (TRX_on_TX())
 	{
+		if (FPGA_bus_stop)
+			return;
+		VFO *current_vfo = CurrentVFO;
+		if (current_vfo->Mode == TRX_MODE_LOOPBACK)
+			return;
+	
+		FPGA_setBusOutput();
 		FPGA_writePacket(3); //TX SEND IQ
 		FPGA_syncAndClockRiseFall();
 		FPGA_fpgadata_sendiq();

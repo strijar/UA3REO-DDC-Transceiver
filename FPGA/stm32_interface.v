@@ -708,7 +708,7 @@ begin
 		BUS_SPI_enable = 1;
 		BUS_SPI_Stage = 1;
 	end
-	else if(BUS_SPI_Stage == 1 && BUS_SPI_busy == 1) //wait
+	else if(BUS_SPI_Stage == 1 && BUS_SPI_busy == 1) //wait spi
 	begin
 		BUS_SPI_Stage = 2;
 	end
@@ -719,19 +719,23 @@ begin
 		BUS_SPI_enable = 0;
 		BUS_SPI_Stage = 3;
 	end
-	else if(BUS_SPI_Stage == 3 && iq_clk == 0) //start RX1 Q
+	else if(BUS_SPI_Stage == 3) //start RX1 Q
 	begin
 		BUS_SPI_data_out[31:0] = READ_RX1_Q[31:0];
 		BUS_SPI_enable = 1;
 		BUS_SPI_Stage = 4;
 	end
-	else if(BUS_SPI_Stage == 4 && BUS_SPI_busy == 1) //wait
+	else if(BUS_SPI_Stage == 4 && BUS_SPI_busy == 1) //wait spi
 	begin
 		BUS_SPI_Stage = 5;
 	end
 	else if(BUS_SPI_Stage == 5 && BUS_SPI_busy == 0) //end RX1 Q
 	begin
 		BUS_SPI_enable = 0;
+		BUS_SPI_Stage = 6;
+	end
+	else if(BUS_SPI_Stage == 6 && iq_clk == 0) //wait iq clk end
+	begin
 		BUS_SPI_Stage = 0;
 	end
 end
