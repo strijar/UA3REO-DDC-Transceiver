@@ -77,4 +77,6 @@ extern bool FPGA_is_present(void);												// check that the FPGA has firmwar
 extern void FPGA_spi_flash_erase(void); 									// clear flash memory
 extern void FPGA_spi_flash_write(uint32_t flash_pos, uint8_t *buff, uint32_t size); // write new contents of FPGA SPI memory
 extern bool FPGA_spi_flash_verify(uint32_t flash_pos, uint8_t *buff, uint32_t size); // check flash memory
+extern void FPGA_CpltCallback(void);
+extern void FPGA_HalfCpltCallback(void);
 #endif
