@@ -708,9 +708,11 @@ begin
 		BUS_SPI_enable = 1;
 		BUS_SPI_Stage = 1;
 	end
-	else if(BUS_SPI_Stage == 1 && BUS_SPI_busy == 1) //wait spi
+	else if(BUS_SPI_Stage == 1) //wait spi
 	begin
-		BUS_SPI_Stage = 2;
+		BUS_SPI_enable = 1;
+		if(BUS_SPI_busy == 1)
+			BUS_SPI_Stage = 2;
 	end
 	else if(BUS_SPI_Stage == 2 && BUS_SPI_busy == 0) //end RX1 I
 	begin
