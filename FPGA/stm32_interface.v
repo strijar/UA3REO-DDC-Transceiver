@@ -727,9 +727,11 @@ begin
 		BUS_SPI_enable = 1;
 		BUS_SPI_Stage = 4;
 	end
-	else if(BUS_SPI_Stage == 4 && BUS_SPI_busy == 1) //wait spi
+	else if(BUS_SPI_Stage == 4) //wait spi
 	begin
-		BUS_SPI_Stage = 5;
+		BUS_SPI_enable = 1;
+		if(BUS_SPI_busy == 1)
+			BUS_SPI_Stage = 5;
 	end
 	else if(BUS_SPI_Stage == 5 && BUS_SPI_busy == 0) //end RX1 Q
 	begin
