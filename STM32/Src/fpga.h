@@ -21,10 +21,10 @@
     for (uint32_t wait = 0; wait < 50; wait++) \
         __asm("nop");
 
-#define FPGA_writePacket(value) (FPGA_BUS_D0_GPIO_Port->BSRR = (value) | 0xFF0000)
-#define FPGA_readPacket (FPGA_BUS_D0_GPIO_Port->IDR & 0xFF)
-#define FPGA_setGPIOBusInput GPIOA->MODER = -1431764992
-#define FPGA_setGPIOBusOutput GPIOA->MODER = -1431743147
+#define FPGA_writePacket(value) (FPGA_BUS_D0_GPIO_Port->BSRR = (value & 0xF) | 0xF0000)
+#define FPGA_readPacket (FPGA_BUS_D0_GPIO_Port->IDR & 0xF)
+#define FPGA_setGPIOBusInput GPIOA->MODER = 2862721536
+#define FPGA_setGPIOBusOutput GPIOA->MODER = 2862721621
 
 //Micron M25P80 Serial Flash COMMANDS:
 #define M25P80_WRITE_ENABLE 0x06

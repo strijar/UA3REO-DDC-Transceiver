@@ -131,10 +131,6 @@ set_location_assignment PIN_31 -to STM32_DATA_BUS[0]
 set_location_assignment PIN_30 -to STM32_DATA_BUS[1]
 set_location_assignment PIN_28 -to STM32_DATA_BUS[2]
 set_location_assignment PIN_144 -to STM32_DATA_BUS[3]
-set_location_assignment PIN_143 -to STM32_DATA_BUS[4]
-set_location_assignment PIN_142 -to STM32_DATA_BUS[5]
-set_location_assignment PIN_141 -to STM32_DATA_BUS[6]
-set_location_assignment PIN_137 -to STM32_DATA_BUS[7]
 set_location_assignment PIN_8 -to FLASH_S
 set_location_assignment PIN_12 -to FLASH_C
 set_location_assignment PIN_13 -to FLASH_MISO
@@ -196,10 +192,6 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_SYNC
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to ADC_OTR
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_I2S_CLOCK
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to AUDIO_48K_CLOCK
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[7]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[6]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[5]
-set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[4]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[3]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[2]
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to STM32_DATA_BUS[1]
@@ -257,10 +249,6 @@ set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to DAC_OUTPUT[0]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to DAC_PD
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to PREAMP
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_CLK
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[7]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[6]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[5]
-set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[4]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[3]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[2]
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR ON -to STM32_DATA_BUS[1]
@@ -286,9 +274,18 @@ set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to VCXO_CHARGE_PUMP
 set_instance_assignment -name WEAK_PULL_UP_RESISTOR OFF -to VCXO_CHARGE_PUMP
 set_location_assignment PIN_76 -to DAC_DRV_A0
 set_location_assignment PIN_77 -to DAC_DRV_A1
+set_location_assignment PIN_143 -to BUS_CS
+set_location_assignment PIN_142 -to BUS_CLK
+set_location_assignment PIN_141 -to BUS_MISO
+set_location_assignment PIN_137 -to BUS_MOSI
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_CLK
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_CS
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_MISO
+set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to BUS_MOSI
 set_global_assignment -name BDF_FILE WOLF.bdf
 set_global_assignment -name VERILOG_FILE DAC_corrector.v
 set_global_assignment -name VERILOG_FILE spi_interface.v
+set_global_assignment -name VERILOG_FILE spi32_interface.v
 set_global_assignment -name VERILOG_FILE stm32_interface.v
 set_global_assignment -name VERILOG_FILE data_shifter.v
 set_global_assignment -name VERILOG_FILE vcxo_controller.v -hdl_version Verilog_2001

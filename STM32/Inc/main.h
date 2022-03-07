@@ -50,6 +50,7 @@ extern DMA_HandleTypeDef hdma_spi2_tx;
 
 extern RTC_HandleTypeDef hrtc;
 
+extern SPI_HandleTypeDef hspi1;
 extern SPI_HandleTypeDef hspi2;
 
 extern TIM_HandleTypeDef htim2;
@@ -124,14 +125,14 @@ void Error_Handler(void);
 #define FPGA_BUS_D2_GPIO_Port GPIOA
 #define FPGA_BUS_D3_Pin GPIO_PIN_3
 #define FPGA_BUS_D3_GPIO_Port GPIOA
-#define FPGA_BUS_D4_Pin GPIO_PIN_4
-#define FPGA_BUS_D4_GPIO_Port GPIOA
-#define FPGA_BUS_D5_Pin GPIO_PIN_5
-#define FPGA_BUS_D5_GPIO_Port GPIOA
-#define FPGA_BUS_D6_Pin GPIO_PIN_6
-#define FPGA_BUS_D6_GPIO_Port GPIOA
-#define FPGA_BUS_D7_Pin GPIO_PIN_7
-#define FPGA_BUS_D7_GPIO_Port GPIOA
+#define FPGA_BUS_NSS_Pin GPIO_PIN_4
+#define FPGA_BUS_NSS_GPIO_Port GPIOA
+#define FPGA_BUS_SCK_Pin GPIO_PIN_5
+#define FPGA_BUS_SCK_GPIO_Port GPIOA
+#define FPGA_BUS_MISO_Pin GPIO_PIN_6
+#define FPGA_BUS_MISO_GPIO_Port GPIOA
+#define FPGA_BUS_MOSI_Pin GPIO_PIN_7
+#define FPGA_BUS_MOSI_GPIO_Port GPIOA
 #define PTT_IN_Pin GPIO_PIN_4
 #define PTT_IN_GPIO_Port GPIOC
 #define PTT_IN_EXTI_IRQn EXTI4_IRQn

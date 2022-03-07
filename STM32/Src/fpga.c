@@ -11,7 +11,7 @@ volatile bool FPGA_NeedRestart = true;		 // flag of necessity to restart FPGA mo
 volatile bool FPGA_Buffer_underrun = false;	 // flag of lack of data from FPGA
 uint_fast16_t FPGA_Audio_RXBuffer_Index = 0; // current index in FPGA buffers
 uint_fast16_t FPGA_Audio_TXBuffer_Index = 0; // current index in FPGA buffers
-bool FPGA_Audio_Buffer_State = true;		 // buffer state, half or full full true - compleate; false - half
+bool FPGA_Audio_Buffer_State = true;		 // buffer state, half or full full true - complete; false - half
 bool FPGA_RX_Buffer_Current = true;			 // buffer state, false - fill B, work A
 bool FPGA_RX_buffer_ready = true;
 volatile float32_t FPGA_Audio_Buffer_RX1_Q_A[FPGA_RX_IQ_BUFFER_HALF_SIZE] = {0}; // FPGA buffers
@@ -29,6 +29,9 @@ uint8_t ADCDAC_OVR_StatusLatency = 0;
 bool FPGA_bus_stop = true;					  // suspend the FPGA bus
 volatile bool FPGA_bus_test_result = true; //self-test flag
 int16_t ADC_RAW_IN = 0;
+
+IRAM2 int32_t FPGA_BUS_BUFFER_RX[FPGA_RX_IQ_BUFFER_SIZE] = {0};
+IRAM2 int32_t FPGA_BUS_BUFFER_TX[FPGA_RX_IQ_BUFFER_SIZE] = {0};
 
 // Private variables
 static GPIO_InitTypeDef FPGA_GPIO_InitStruct; // structure of GPIO ports
@@ -49,7 +52,7 @@ void FPGA_Init(bool bus_test, bool firmware_test)
 {
 	FPGA_bus_stop = true;
 
-	FPGA_GPIO_InitStruct.Pin = FPGA_BUS_D0_Pin | FPGA_BUS_D1_Pin | FPGA_BUS_D2_Pin | FPGA_BUS_D3_Pin | FPGA_BUS_D4_Pin | FPGA_BUS_D5_Pin | FPGA_BUS_D6_Pin | FPGA_BUS_D7_Pin;
+	FPGA_GPIO_InitStruct.Pin = FPGA_BUS_D0_Pin | FPGA_BUS_D1_Pin | FPGA_BUS_D2_Pin | FPGA_BUS_D3_Pin;
 	FPGA_GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
 	FPGA_GPIO_InitStruct.Pull = GPIO_PULLUP;
 	FPGA_GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
@@ -61,8 +64,11 @@ void FPGA_Init(bool bus_test, bool firmware_test)
 	FPGA_GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
 	HAL_GPIO_Init(FPGA_CLK_GPIO_Port, &FPGA_GPIO_InitStruct);
 
+	//Init DMA
+	HAL_SPI_TransmitReceive_DMA(&hspi1, (uint8_t*)FPGA_BUS_BUFFER_TX, (uint8_t*)FPGA_BUS_BUFFER_RX, FPGA_RX_IQ_BUFFER_SIZE);
+	
 	//BUS TEST
-	for (uint16_t i = 0; i < 256; i++)
+	for (uint16_t i = 0; i < 16; i++)
 	{
 		FPGA_setBusOutput();
 		FPGA_writePacket(0);
@@ -95,13 +101,22 @@ void FPGA_Init(bool bus_test, bool firmware_test)
 
 	FPGA_setBusInput();
 	FPGA_clockRise();
-	FPGA_FW_Version[2] = FPGA_readPacket;
+	FPGA_FW_Version[2] = FPGA_readPacket << 4;
 	FPGA_clockFall();
 	FPGA_clockRise();
-	FPGA_FW_Version[1] = FPGA_readPacket;
+	FPGA_FW_Version[2] |= FPGA_readPacket;
 	FPGA_clockFall();
 	FPGA_clockRise();
-	FPGA_FW_Version[0] = FPGA_readPacket;
+	FPGA_FW_Version[1] = FPGA_readPacket << 4;
+	FPGA_clockFall();
+	FPGA_clockRise();
+	FPGA_FW_Version[1] |= FPGA_readPacket;
+	FPGA_clockFall();
+	FPGA_clockRise();
+	FPGA_FW_Version[0] = FPGA_readPacket << 4;
+	FPGA_clockFall();
+	FPGA_clockRise();
+	FPGA_FW_Version[0] |= FPGA_readPacket;
 	FPGA_clockFall();
 
 	if (bus_test) //BUS STRESS TEST MODE
@@ -111,7 +126,7 @@ void FPGA_Init(bool bus_test, bool firmware_test)
 
 		while (bus_test)
 		{
-			for (uint16_t i = 0; i < 256; i++)
+			for (uint16_t i = 0; i < 16; i++)
 			{
 				FPGA_setBusOutput();
 				FPGA_writePacket(0);
@@ -134,7 +149,7 @@ void FPGA_Init(bool bus_test, bool firmware_test)
 					HAL_Delay(1000);
 				}
 			}
-			LCD_showError("Check compleate!", false);
+			LCD_showError("Check complete!", false);
 		}
 	}
 
@@ -276,114 +291,163 @@ static inline void FPGA_fpgadata_sendparam(void)
 	bitWrite(FPGA_fpgadata_out_tmp8, 1, (!TRX.ADC_SHDN && TRX.Dual_RX && !TRX_on_TX() && CurrentVFO->Mode != TRX_MODE_LOOPBACK)); //RX2
 	bitWrite(FPGA_fpgadata_out_tmp8, 2, (TRX_on_TX() && CurrentVFO->Mode != TRX_MODE_LOOPBACK));								   //TX
 	bitWrite(FPGA_fpgadata_out_tmp8, 3, TRX.ADC_DITH);
-	bitWrite(FPGA_fpgadata_out_tmp8, 4, TRX.ADC_SHDN);
+	FPGA_writePacket(FPGA_fpgadata_out_tmp8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_fpgadata_out_tmp8 = 0;
+	bitWrite(FPGA_fpgadata_out_tmp8, 0, TRX.ADC_SHDN);
 	if (TRX_on_TX())
-		bitWrite(FPGA_fpgadata_out_tmp8, 4, true); //shutdown ADC on TX
-	bitWrite(FPGA_fpgadata_out_tmp8, 5, TRX.ADC_RAND);
-	bitWrite(FPGA_fpgadata_out_tmp8, 6, TRX.ADC_PGA);
+		bitWrite(FPGA_fpgadata_out_tmp8, 0, true); //shutdown ADC on TX
+	bitWrite(FPGA_fpgadata_out_tmp8, 1, TRX.ADC_RAND);
+	bitWrite(FPGA_fpgadata_out_tmp8, 2, TRX.ADC_PGA);
 	if (!TRX_on_TX())
-		bitWrite(FPGA_fpgadata_out_tmp8, 7, TRX.ADC_Driver);
+		bitWrite(FPGA_fpgadata_out_tmp8, 3, TRX.ADC_Driver);
 	FPGA_writePacket(FPGA_fpgadata_out_tmp8);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 3
 	//out RX1-FREQ
-	FPGA_writePacket(((TRX_freq_phrase & (0xFFU << 24)) >> 24));
+	FPGA_writePacket(TRX_freq_phrase >> 28);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase >> 24);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
-	//STAGE 4
-	//out RX1-FREQ
-	FPGA_writePacket(((TRX_freq_phrase & (0XFFU << 16)) >> 16));
+	FPGA_writePacket(TRX_freq_phrase >> 20);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase >> 16);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
-	//STAGE 5
-	//OUT RX1-FREQ
-	FPGA_writePacket(((TRX_freq_phrase & (0XFFU << 8)) >> 8));
+	FPGA_writePacket(TRX_freq_phrase >> 12);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
-	//STAGE 6
-	//OUT RX1-FREQ
-	FPGA_writePacket(TRX_freq_phrase & 0XFFU);
+	FPGA_writePacket(TRX_freq_phrase >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 7
 	//out RX2-FREQ
-	FPGA_writePacket(((TRX_freq_phrase2 & (0XFFU << 24)) >> 24));
+	FPGA_writePacket(TRX_freq_phrase2 >> 28);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
-	//STAGE 8
-	//out RX2-FREQ
-	FPGA_writePacket(((TRX_freq_phrase2 & (0XFFU << 16)) >> 16));
+	FPGA_writePacket(TRX_freq_phrase2 >> 24);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 9
-	//OUT RX2-FREQ
-	FPGA_writePacket(((TRX_freq_phrase2 & (0XFFU << 8)) >> 8));
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 20);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 10
-	//OUT RX2-FREQ
-	FPGA_writePacket(TRX_freq_phrase2 & 0XFF);
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 16);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 12);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase2 >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 11
 	//OUT CICCOMP-GAIN
+	FPGA_fpgadata_out_tmp8 = 0;
 	switch (TRX_GetRXSampleRateENUM)
 	{
-	case TRX_SAMPLERATE_K48:
-		FPGA_writePacket(CALIBRATE.CICFIR_GAINER_48K_val);
-		break;
-	case TRX_SAMPLERATE_K96:
-		FPGA_writePacket(CALIBRATE.CICFIR_GAINER_96K_val);
-		break;
-	case TRX_SAMPLERATE_K192:
-		FPGA_writePacket(CALIBRATE.CICFIR_GAINER_192K_val);
-		break;
-	case TRX_SAMPLERATE_K384:
-		FPGA_writePacket(CALIBRATE.CICFIR_GAINER_384K_val);
-		break;
-	default:
-		break;
+		case TRX_SAMPLERATE_K48:
+			FPGA_fpgadata_out_tmp8 = CALIBRATE.CICFIR_GAINER_48K_val;
+			break;
+		case TRX_SAMPLERATE_K96:
+			FPGA_fpgadata_out_tmp8 = CALIBRATE.CICFIR_GAINER_96K_val;
+			break;
+		case TRX_SAMPLERATE_K192:
+			FPGA_fpgadata_out_tmp8 = CALIBRATE.CICFIR_GAINER_192K_val;
+			break;
+		case TRX_SAMPLERATE_K384:
+			FPGA_fpgadata_out_tmp8 = CALIBRATE.CICFIR_GAINER_384K_val;
+			break;
+		default:
+			break;
 	}
+	FPGA_writePacket(FPGA_fpgadata_out_tmp8 >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_tmp8 >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 12
 	//OUT TX-CICCOMP-GAIN
-	FPGA_writePacket(CALIBRATE.TXCICFIR_GAINER_val);
+	FPGA_writePacket(CALIBRATE.TXCICFIR_GAINER_val >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(CALIBRATE.TXCICFIR_GAINER_val >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 13
 	//OUT DAC-GAIN
-	FPGA_writePacket(CALIBRATE.DAC_GAINER_val);
+	FPGA_writePacket(CALIBRATE.DAC_GAINER_val >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(CALIBRATE.DAC_GAINER_val >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 14
 	//OUT ADC OFFSET
-	FPGA_writePacket(((CALIBRATE.adc_offset & (0XFFU << 8)) >> 8));
+	FPGA_writePacket(CALIBRATE.adc_offset >> 12);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 15
-	//OUT ADC OFFSET
-	FPGA_writePacket(CALIBRATE.adc_offset & 0XFFU);
+	
+	FPGA_writePacket(CALIBRATE.adc_offset >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(CALIBRATE.adc_offset >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(CALIBRATE.adc_offset >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 16
 	//OUT VCXO OFFSET
-	FPGA_writePacket(CALIBRATE.VCXO_correction);
+	FPGA_writePacket(CALIBRATE.VCXO_correction >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(CALIBRATE.VCXO_correction >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 
@@ -394,29 +458,34 @@ static inline void FPGA_fpgadata_sendparam(void)
 	bitWrite(FPGA_fpgadata_out_tmp8, 1, TRX_DAC_DIV1);
 	bitWrite(FPGA_fpgadata_out_tmp8, 2, TRX_DAC_HP1);
 	bitWrite(FPGA_fpgadata_out_tmp8, 3, TRX_DAC_HP2);
-	bitWrite(FPGA_fpgadata_out_tmp8, 4, TRX_DAC_X4);
-	bitWrite(FPGA_fpgadata_out_tmp8, 5, TRX_DCDC_Freq);
+	FPGA_writePacket(FPGA_fpgadata_out_tmp8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_fpgadata_out_tmp8 = 0;
+	bitWrite(FPGA_fpgadata_out_tmp8, 0, TRX_DAC_X4);
+	bitWrite(FPGA_fpgadata_out_tmp8, 1, TRX_DCDC_Freq);
 	//11 - 48khz 01 - 96khz 10 - 192khz 00 - 384khz IQ speed
 	switch (TRX_GetRXSampleRateENUM)
 	{
-	case TRX_SAMPLERATE_K48:
-		bitWrite(FPGA_fpgadata_out_tmp8, 6, 1);
-		bitWrite(FPGA_fpgadata_out_tmp8, 7, 1);
-		break;
-	case TRX_SAMPLERATE_K96:
-		bitWrite(FPGA_fpgadata_out_tmp8, 6, 0);
-		bitWrite(FPGA_fpgadata_out_tmp8, 7, 1);
-		break;
-	case TRX_SAMPLERATE_K192:
-		bitWrite(FPGA_fpgadata_out_tmp8, 6, 1);
-		bitWrite(FPGA_fpgadata_out_tmp8, 7, 0);
-		break;
-	case TRX_SAMPLERATE_K384:
-		bitWrite(FPGA_fpgadata_out_tmp8, 6, 0);
-		bitWrite(FPGA_fpgadata_out_tmp8, 7, 0);
-		break;
-	default:
-		break;
+		case TRX_SAMPLERATE_K48:
+			bitWrite(FPGA_fpgadata_out_tmp8, 2, 1);
+			bitWrite(FPGA_fpgadata_out_tmp8, 3, 1);
+			break;
+		case TRX_SAMPLERATE_K96:
+			bitWrite(FPGA_fpgadata_out_tmp8, 2, 0);
+			bitWrite(FPGA_fpgadata_out_tmp8, 3, 1);
+			break;
+		case TRX_SAMPLERATE_K192:
+			bitWrite(FPGA_fpgadata_out_tmp8, 2, 1);
+			bitWrite(FPGA_fpgadata_out_tmp8, 3, 0);
+			break;
+		case TRX_SAMPLERATE_K384:
+			bitWrite(FPGA_fpgadata_out_tmp8, 2, 0);
+			bitWrite(FPGA_fpgadata_out_tmp8, 3, 0);
+			break;
+		default:
+			break;
 	}
 	FPGA_writePacket(FPGA_fpgadata_out_tmp8);
 	FPGA_clockRise();
@@ -424,25 +493,35 @@ static inline void FPGA_fpgadata_sendparam(void)
 
 	//STAGE 18
 	//out TX-FREQ
-	FPGA_writePacket(((TRX_freq_phrase_tx & (0XFFU << 24)) >> 24));
+	FPGA_writePacket(TRX_freq_phrase_tx >> 28);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 19
-	//out TX-FREQ
-	FPGA_writePacket(((TRX_freq_phrase_tx & (0XFFU << 16)) >> 16));
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 24);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 20
-	//OUT TX-FREQ
-	FPGA_writePacket(((TRX_freq_phrase_tx & (0XFFU << 8)) >> 8));
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 20);
 	FPGA_clockRise();
 	FPGA_clockFall();
-
-	//STAGE 21
-	//OUT TX-FREQ
-	FPGA_writePacket(TRX_freq_phrase_tx & 0XFFU);
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 16);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 12);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(TRX_freq_phrase_tx >> 0);
 	FPGA_clockRise();
 	FPGA_clockFall();
 	
@@ -467,17 +546,18 @@ static inline void FPGA_fpgadata_sendparam(void)
 // get parameters
 static inline void FPGA_fpgadata_getparam(void)
 {
-	register uint8_t FPGA_fpgadata_in_tmp8 = 0;
-	register int32_t FPGA_fpgadata_in_tmp32 = 0;
+	register uint8_t FPGA_fpgadata_in_tmp_u8 = 0;
+	register int16_t FPGA_fpgadata_in_tmp_i16 = 0;
+	register int32_t FPGA_fpgadata_in_tmp_i32 = 0;
 	FPGA_setBusInput();
 
 	//STAGE 2
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp8 = FPGA_readPacket;
+	FPGA_fpgadata_in_tmp_u8 = FPGA_readPacket;
 	if(ADCDAC_OVR_StatusLatency >= 50)
 	{
-		TRX_ADC_OTR = bitRead(FPGA_fpgadata_in_tmp8, 0);
-		TRX_DAC_OTR = bitRead(FPGA_fpgadata_in_tmp8, 1);
+		TRX_ADC_OTR = bitRead(FPGA_fpgadata_in_tmp_u8, 0);
+		TRX_DAC_OTR = bitRead(FPGA_fpgadata_in_tmp_u8, 1);
 	}
 	else
 		ADCDAC_OVR_StatusLatency++;
@@ -486,52 +566,92 @@ static inline void FPGA_fpgadata_getparam(void)
 		println("iq overrun");*/
 	FPGA_clockFall();
 
-	//STAGE 3
+	//STAGE 3 TRX_ADC_MINAMPLITUDE
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp8 = FPGA_readPacket;
+	FPGA_fpgadata_in_tmp_i16 = FPGA_readPacket << 12;
 	FPGA_clockFall();
-	//STAGE 4
+	
 	FPGA_clockRise();
-	TRX_ADC_MINAMPLITUDE = (int16_t)(((FPGA_fpgadata_in_tmp8 << 8) & 0xFF00) | FPGA_readPacket);
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 8;
 	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 0;
+	FPGA_clockFall();
+	TRX_ADC_MINAMPLITUDE = FPGA_fpgadata_in_tmp_i16;
 
-	//STAGE 5
+	//STAGE 5 TRX_ADC_MAXAMPLITUDE
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp8 = FPGA_readPacket;
+	FPGA_fpgadata_in_tmp_i16 = FPGA_readPacket << 12;
 	FPGA_clockFall();
-	//STAGE 6
+	
 	FPGA_clockRise();
-	TRX_ADC_MAXAMPLITUDE = (int16_t)(((FPGA_fpgadata_in_tmp8 << 8) & 0xFF00) | FPGA_readPacket);
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 8;
 	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 0;
+	FPGA_clockFall();
+	TRX_ADC_MAXAMPLITUDE = FPGA_fpgadata_in_tmp_i16;
 
 	//STAGE 7 - TCXO ERROR
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp8 = FPGA_readPacket;
-	FPGA_fpgadata_in_tmp32 = 0;
-	if (bitRead(FPGA_fpgadata_in_tmp8, 7) == 1)
-		FPGA_fpgadata_in_tmp32 = 0xFF000000;
-	FPGA_fpgadata_in_tmp32 |= (FPGA_fpgadata_in_tmp8 << 16);
-	FPGA_clockFall();
-	//STAGE 8
-	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
-	FPGA_clockFall();
-	//STAGE 9
-	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
-	TRX_VCXO_ERROR = FPGA_fpgadata_in_tmp32;
+	FPGA_fpgadata_in_tmp_u8 = FPGA_readPacket;
+	FPGA_fpgadata_in_tmp_i32 = 0;
+	if (bitRead(FPGA_fpgadata_in_tmp_u8, 3) == 1)
+		FPGA_fpgadata_in_tmp_i32 = 0xFF000000;
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_fpgadata_in_tmp_u8 << 20;
 	FPGA_clockFall();
 	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_readPacket << 16;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_readPacket << 12;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_readPacket << 8;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i32 |= FPGA_readPacket << 0;
+	FPGA_clockFall();
+
+	TRX_VCXO_ERROR = FPGA_fpgadata_in_tmp_i32;
+	
 	//STAGE 10 - ADC RAW DATA
-	FPGA_fpgadata_in_tmp32 = 0;
+	FPGA_fpgadata_in_tmp_i16 = 0;
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 12;
 	FPGA_clockFall();
-	//STAGE 11
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 8;
 	FPGA_clockFall();
-	ADC_RAW_IN = (int16_t)(FPGA_fpgadata_in_tmp32 & 0xFFFF);
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp_i16 |= FPGA_readPacket << 0;
+	FPGA_clockFall();
+	
+	ADC_RAW_IN = (int16_t)(FPGA_fpgadata_in_tmp_i16 & 0xFFFF);
 }
 
 // get IQ data
@@ -550,44 +670,70 @@ static inline void FPGA_fpgadata_getiq(void)
 
 	//STAGE 2 in Q RX1
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 = (FPGA_readPacket << 24);
+	FPGA_fpgadata_in_tmp32 = FPGA_readPacket << 28;
 	FPGA_clockFall();
-
-	//STAGE 3
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 16);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 24;
 	FPGA_clockFall();
-
-	//STAGE 4
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 20;
 	FPGA_clockFall();
-
-	//STAGE 5
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 16;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 12;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 8;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 0;
 	FPGA_clockFall();
 
 	FPGA_fpgadata_in_float32_q = (float32_t)FPGA_fpgadata_in_tmp32;
 
 	//STAGE 6 in I RX1
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 = (FPGA_readPacket << 24);
+	FPGA_fpgadata_in_tmp32 = FPGA_readPacket << 28;
 	FPGA_clockFall();
 
-	//STAGE 7
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 16);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 24;
 	FPGA_clockFall();
-
-	//STAGE 8
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 20;
 	FPGA_clockFall();
-
-	//STAGE 9
+	
 	FPGA_clockRise();
-	FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 16;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 12;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 8;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 4;
+	FPGA_clockFall();
+	
+	FPGA_clockRise();
+	FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 0;
 	FPGA_clockFall();
 
 	FPGA_fpgadata_in_float32_q = FPGA_fpgadata_in_float32_q * 4.656612873077393e-10; //int to float
@@ -602,44 +748,70 @@ static inline void FPGA_fpgadata_getiq(void)
 	{
 		//STAGE 10 in Q RX2
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 = (FPGA_readPacket << 24);
+		FPGA_fpgadata_in_tmp32 = FPGA_readPacket << 28;
 		FPGA_clockFall();
-
-		//STAGE 11
+		
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 16);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 24;
 		FPGA_clockFall();
-
-		//STAGE 12
+		
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 20;
 		FPGA_clockFall();
-
-		//STAGE 13
+		
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 16;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 12;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 8;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 4;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 0;
 		FPGA_clockFall();
 
 		FPGA_fpgadata_in_float32_q = (float32_t)FPGA_fpgadata_in_tmp32;
 
 		//STAGE 14 in I RX2
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 = (FPGA_readPacket << 24);
+		FPGA_fpgadata_in_tmp32 = FPGA_readPacket << 28;
 		FPGA_clockFall();
 
-		//STAGE 15
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 16);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 24;
 		FPGA_clockFall();
-
-		//STAGE 16
+		
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket << 8);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 20;
 		FPGA_clockFall();
-
-		//STAGE 17
+		
 		FPGA_clockRise();
-		FPGA_fpgadata_in_tmp32 |= (FPGA_readPacket);
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 16;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 12;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 8;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 4;
+		FPGA_clockFall();
+		
+		FPGA_clockRise();
+		FPGA_fpgadata_in_tmp32 |= FPGA_readPacket << 0;
 		FPGA_clockFall();
 
 		FPGA_fpgadata_in_float32_q = FPGA_fpgadata_in_float32_q * 4.656612873077393e-10; //int to float
@@ -740,6 +912,12 @@ static inline void FPGA_fpgadata_getiq(void)
 			}
 		}
 	}
+	
+	if(FFT_buff_index == 0)
+	{
+		Aligned_CleanInvalidateDCache_by_Addr((uint32_t)FPGA_BUS_BUFFER_RX, sizeof(FPGA_BUS_BUFFER_RX));
+		println(FPGA_BUS_BUFFER_RX[0], " ", FPGA_BUS_BUFFER_RX[1], " ", FPGA_BUS_BUFFER_RX[2], " ", FPGA_BUS_BUFFER_RX[3]);
+	}
 }
 
 // send IQ data
@@ -760,59 +938,69 @@ static inline void FPGA_fpgadata_sendiq(void)
 	}
 
 	//STAGE 2 out Q
-	FPGA_writePacket((FPGA_fpgadata_out_q_tmp32 >> 24) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 28);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
 
-	//STAGE 3
-	FPGA_writePacket((FPGA_fpgadata_out_q_tmp32 >> 16) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 24);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
 
-	//STAGE 4
-	FPGA_writePacket((FPGA_fpgadata_out_q_tmp32 >> 8) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 20);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
 
-	//STAGE 5
-	FPGA_writePacket((FPGA_fpgadata_out_q_tmp32 >> 0) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 16);
 	FPGA_clockRise();
-	//clock
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 12);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_q_tmp32 >> 0);
+	FPGA_clockRise();
 	FPGA_clockFall();
 
 	//STAGE 6 out I
-	FPGA_writePacket((FPGA_fpgadata_out_i_tmp32 >> 24) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 28);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
 
-	//STAGE 7
-	FPGA_writePacket((FPGA_fpgadata_out_i_tmp32 >> 16) & 0xFF);
-	//clock
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 24);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
-
-	//STAGE 8
-	FPGA_writePacket((FPGA_fpgadata_out_i_tmp32 >> 8) & 0xFF);
-	//clock
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 20);
 	FPGA_clockRise();
-	//clock
 	FPGA_clockFall();
-
-	//STAGE 9
-	FPGA_writePacket((FPGA_fpgadata_out_i_tmp32 >> 0) & 0xFF);
-	//clock
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 16);
 	FPGA_clockRise();
-	//clock
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 12);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 8);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
+	
+	FPGA_writePacket(FPGA_fpgadata_out_i_tmp32 >> 0);
+	FPGA_clockRise();
 	FPGA_clockFall();
 
 	FPGA_Audio_TXBuffer_Index++;
@@ -858,15 +1046,7 @@ static inline void FPGA_setBusInput(void)
 	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (2 * 2U));
 	temp &= ~(GPIO_MODER_MODE0 << (3 * 2U));
 	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (3 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (4 * 2U));
-	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (4 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (5 * 2U));
-	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (5 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (6 * 2U));
-	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (6 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (7 * 2U));
-	temp |= ((GPIO_MODE_INPUT & 0x00000003U) << (7 * 2U));
-	//sendToDebug_uint32(temp,false);
+	println("IN", temp);
 	GPIOA->MODER = temp;*/
 
 	FPGA_setGPIOBusInput; // macros
@@ -885,15 +1065,7 @@ static inline void FPGA_setBusOutput(void)
 	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (2 * 2U));
 	temp &= ~(GPIO_MODER_MODE0 << (3 * 2U));
 	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (3 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (4 * 2U));
-	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (4 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (5 * 2U));
-	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (5 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (6 * 2U));
-	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (6 * 2U));
-	temp &= ~(GPIO_MODER_MODE0 << (7 * 2U));
-	temp |= ((GPIO_MODE_OUTPUT_PP & 0x00000003U) << (7 * 2U));
-	//sendToDebug_uint32(temp,false);
+	println("OUT", temp);
 	GPIOA->MODER = temp;*/
 
 	FPGA_setGPIOBusOutput; // macros
@@ -928,6 +1100,9 @@ static uint8_t FPGA_spi_start_command(uint8_t command) // execute command to SPI
 	FPGA_FLASH_COMMAND_DELAY
 
 	//STAGE 2 WRITE (F700)
+	FPGA_writePacket(command >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
 	FPGA_writePacket(command);
 	FPGA_clockRise();
 	FPGA_clockFall();
@@ -936,7 +1111,10 @@ static uint8_t FPGA_spi_start_command(uint8_t command) // execute command to SPI
 	//STAGE 3 READ ANSWER (F701)
 	FPGA_setBusInput();
 	FPGA_clockRise();
-	uint8_t data = FPGA_readPacket;
+	uint8_t data = FPGA_readPacket << 4;
+	FPGA_clockFall();
+	FPGA_clockRise();
+	data |= FPGA_readPacket;
 	FPGA_clockFall();
 	FPGA_FLASH_READ_DELAY
 
@@ -956,6 +1134,9 @@ static uint8_t FPGA_spi_continue_command(uint8_t writedata) // Continue reading 
 {
 	//STAGE 2 WRITE (F700)
 	FPGA_setBusOutput();
+	FPGA_writePacket(writedata >> 4);
+	FPGA_clockRise();
+	FPGA_clockFall();
 	FPGA_writePacket(writedata);
 	FPGA_clockRise();
 	FPGA_clockFall();
@@ -964,7 +1145,10 @@ static uint8_t FPGA_spi_continue_command(uint8_t writedata) // Continue reading 
 	//STAGE 3 READ ANSWER (F701)
 	FPGA_setBusInput();
 	FPGA_clockRise();
-	uint8_t data = FPGA_readPacket;
+	uint8_t data = FPGA_readPacket << 4;
+	FPGA_clockFall();
+	FPGA_clockRise();
+	data |= FPGA_readPacket;
 	FPGA_clockFall();
 	FPGA_FLASH_READ_DELAY
 
