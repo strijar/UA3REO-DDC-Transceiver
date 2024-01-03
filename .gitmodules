@@ -1,0 +1,3 @@
+[submodule "STM32/WOLF/Middlewares/Third_Party/CMSIS-DSP"]
+	path = STM32/WOLF/Middlewares/Third_Party/CMSIS-DSP
+	url = https://github.com/ARM-software/CMSIS-DSP.git
