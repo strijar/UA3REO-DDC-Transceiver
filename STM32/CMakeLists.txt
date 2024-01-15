@@ -51,23 +51,21 @@ target_compile_options(${EXECUTABLE} PRIVATE
 )
 
 target_link_options(${EXECUTABLE} PRIVATE
-	-T${linker_script_SRC}
-	-Wl,-Map=${CMAKE_PROJECT_NAME}.map
+	${CPU_PARAMETERS}
 	--specs=nosys.specs
-	-Wl,--start-group
-	-lc
-	-lm
+	-T${linker_script_SRC}
+	-lc -lm -lnosys
 	-lstdc++
 	-lsupc++
-	-Wl,--end-group
-	-Wl,--print-memory-usage
+	-Wl,-Map=${CMAKE_PROJECT_NAME}.map,--cref
+	-Wl,--gc-sections
 )
 
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
 	COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${EXECUTABLE}>
 )
 
-set(SECTIONS -j .isr_vector -j .text -j .rodata -j .ARM.extab -j .ARM -j .preinit_array -j .init_array -j .fini_array)
+set(SECTIONS -j .isr_vector -j .text -j .rodata -j .ARM.extab -j .ARM -j .preinit_array -j .init_array -j .fini_array -j .data)
 
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
 	COMMAND ${CMAKE_OBJCOPY} ${SECTIONS} -O ihex $<TARGET_FILE:${EXECUTABLE}> ${EXECUTABLE}.hex

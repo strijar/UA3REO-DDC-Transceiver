@@ -3,7 +3,7 @@ set(CMAKE_SYSTEM_PROCESSOR          arm)
 
 set(CPU_PARAMETERS                  ${CPU_PARAMETERS} -mcpu=cortex-m7 -mfpu=fpv5-d16 -mfloat-abi=hard -mthumb)
 set(TOOLCHAIN_PREFIX                arm-none-eabi-)
-set(C_FLAGS                         "-fdata-sections -ffunction-sections --specs=nano.specs -Wl,--gc-sections -Os ${CPU_PARAMETERS}")
+set(C_FLAGS                         "-fdata-sections -ffunction-sections -Ofast ${CPU_PARAMETERS} -g")
 set(CPP_FLAGS                       "-fno-rtti -fno-exceptions -fno-threadsafe-statics")
 
 set(CMAKE_C_COMPILER                ${TOOLCHAIN_PREFIX}gcc ${C_FLAGS})

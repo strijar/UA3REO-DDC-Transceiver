@@ -58,14 +58,6 @@ defined in linker script */
   .weak  Reset_Handler
   .type  Reset_Handler, %function
 Reset_Handler:
-
-/* Enable D2SRAM clocks in RCC_AHB2ENR */
-  ldr r0, = 0x580244DC /* 0x58024400 is RCC address section taken from datasheet,
-                          0x0DC is RCC_AHB2ENR register address in section */
-  ldr r1, [r0]
-  orr r1, #0xE0000000 /* Enables 3 MSB in RCC_AHB2ENR responsible for SRAM1, SRAM2, SRAM3 */
-  str r1, [r0]
-
   ldr   sp, =_estack      /* set stack pointer */
 
 /* Call the clock system initialization function.*/
