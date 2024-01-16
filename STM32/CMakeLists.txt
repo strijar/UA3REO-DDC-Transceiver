@@ -41,25 +41,8 @@ include_directories(WOLF/MDK-ARM/RTE/_RA8875_GT911)
 add_subdirectory(WOLF)
 add_subdirectory(Src)
 
-target_link_libraries(${EXECUTABLE} PRIVATE CMSISDSP)
-target_compile_definitions(${EXECUTABLE} PRIVATE ${compiler_define})
-
-target_compile_options(${EXECUTABLE} PRIVATE
-	-Wall
-	-Wpedantic
-	-Wno-unused-parameter
-)
-
-target_link_options(${EXECUTABLE} PRIVATE
-	${CPU_PARAMETERS}
-	--specs=nosys.specs
-	-T${linker_script_SRC}
-	-lc -lm -lnosys
-	-lstdc++
-	-lsupc++
-	-Wl,-Map=${CMAKE_PROJECT_NAME}.map,--cref
-	-Wl,--gc-sections
-)
+target_link_libraries(${EXECUTABLE} PRIVATE CMSISDSP c m nosys)
+target_compile_definitions(${EXECUTABLE} PRIVATE ${HAL} ${DEVICE})
 
 add_custom_command(TARGET ${EXECUTABLE} POST_BUILD
 	COMMAND ${CMAKE_SIZE} $<TARGET_FILE:${EXECUTABLE}>

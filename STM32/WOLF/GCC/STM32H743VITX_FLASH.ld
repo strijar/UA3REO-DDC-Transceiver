@@ -61,13 +61,12 @@ _Min_Stack_Size = 0x2000; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-ITCMRAM (xrw)   : ORIGIN = 0x00000000, LENGTH = 64K
 FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 2048K
 STACK (rw)      : ORIGIN = 0x20000000, LENGTH = 8192
-DTCMRAM (xrw)   : ORIGIN = 0x20002000, LENGTH = 128K-8192
-RW_IRAM2 (xrw)  : ORIGIN = 0x24000000, LENGTH = 512K
-SRAM (xrw)      : ORIGIN = 0x30000000, LENGTH = 288K
-SRAM4 (xrw)     : ORIGIN = 0x38000000, LENGTH = 64K
+DTCMRAM (rw)    : ORIGIN = 0x20002000, LENGTH = 128K-8192
+RW_IRAM2 (rw)   : ORIGIN = 0x24000000, LENGTH = 512K
+SRAM (rw)       : ORIGIN = 0x30000000, LENGTH = 288K
+SRAM4 (rw)      : ORIGIN = 0x38000000, LENGTH = 64K
 }
 
 /* Define output sections */
@@ -178,23 +177,17 @@ SECTIONS
 
   ._IRAM :
   {
-    . = ALIGN(8);
     *(.IRAM)
-    . = ALIGN(8);
   } >RW_IRAM2
 
   ._SRAM :
   {
-    . = ALIGN(8);
     *(.SRAM)
-    . = ALIGN(8);
   } >SRAM
 
   ._SRAM4 :
   {
-    . = ALIGN(8);
     *(.SRAM4)
-    . = ALIGN(8);
   } >SRAM4
 
   /* Remove information from the standard libraries */
