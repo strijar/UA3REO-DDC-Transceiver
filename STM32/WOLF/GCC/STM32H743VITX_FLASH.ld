@@ -53,7 +53,7 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = ORIGIN(DTCMRAM) + LENGTH(DTCMRAM);    /* end of RAM */
+_estack = ORIGIN(STACK) + LENGTH(STACK);
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x000;      /* required amount of heap  */
 _Min_Stack_Size = 0x2000; /* required amount of stack */
@@ -63,7 +63,7 @@ MEMORY
 {
 FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 2048K
 STACK (rw)      : ORIGIN = 0x20000000, LENGTH = 8192
-DTCMRAM (rw)    : ORIGIN = 0x20002000, LENGTH = 128K-8192
+DTCMRAM (rw)    : ORIGIN = 0x20000000 + LENGTH(STACK), LENGTH = 128K - LENGTH(STACK)
 RW_IRAM2 (rw)   : ORIGIN = 0x24000000, LENGTH = 512K
 SRAM (rw)       : ORIGIN = 0x30000000, LENGTH = 288K
 SRAM4 (rw)      : ORIGIN = 0x38000000, LENGTH = 64K
